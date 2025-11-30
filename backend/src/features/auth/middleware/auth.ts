@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
-import { verifyToken } from "./auth.services.js";
-import { ACCESS_KEY, ECODE_403, EMESSAGE_403 } from "./constants.js";
+import { ACCESS_KEY, ECODE_403, EMESSAGE_403 } from "../constants.js";
+import { verifyToken } from "../services/jwt.js";
 
 async function protectedRoute(req: Request, res: Response, next: NextFunction) {
   try {

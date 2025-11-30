@@ -3,18 +3,17 @@ import express, {
   type Response,
   type NextFunction,
 } from "express";
+import type { User } from "../types.js";
+import { ValidationError } from "@/common/errors.js";
+import { ECODE_403, EMESSAGE_403 } from "../constants.js";
+import { login, signup } from "../services/auth.js";
 import {
-  findUser,
-  findUserAndVerify,
   generateAccessToken,
   generateTokens,
   verifyRefresh,
-  verifyToken,
-  writeNewUser,
-} from "./auth.services.js";
-import type { User } from "./types.js";
-import { ValidationError } from "./errors.js";
-import { ECODE_403, EMESSAGE_403 } from "./constants.js";
+} from "../services/jwt.js";
+import { getUserById } from "../db/user.js";
+import { invalidateRefreshToken, saveRefreshToken } from "../db/token.js";
 const router = express.Router();
 
 const REFRESH_KEY = "refresh_token";
@@ -24,7 +23,7 @@ router.post(
   async function (req: Request, res: Response, next: NextFunction) {
     try {
       const body = req.body as User;
-      await writeNewUser(body.username, body.password);
+      await signup(body.username, body.password, "user");
       return res.status(200).json({ success: true });
     } catch (err) {
       let message = "Unknown error";
@@ -39,17 +38,23 @@ router.post(
     }
   }
 );
-/* GET home page. */
+
+/* Login to Application and get tokens */
 router.post(
   "/login",
   async function (req: Request, res: Response, next: NextFunction) {
     try {
       const body = req.body as User;
-      const user = await findUserAndVerify(body.username, body.password);
+      const user = await login(body.username, body.password);
 
       const { accessToken, refreshToken } = await generateTokens(user);
 
-      // generate refresh token & auth token
+      //  Add refresh token to db
+      const in7Days = new Date();
+      in7Days.setDate(in7Days.getDate() + 7);
+      await saveRefreshToken(refreshToken, in7Days, user.id);
+
+      // save refresh token in cookie
       res.cookie(REFRESH_KEY, refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production", // Use secure in production
@@ -61,7 +66,7 @@ router.post(
 
       return res.status(200).json({
         success: true,
-        data: { username: user.username },
+        data: { username: user.username, id: user.id, role: user.role },
         accessToken,
       });
     } catch (err) {
@@ -86,18 +91,24 @@ router.get(
   "/refresh",
   async function (req: Request, res: Response, next: NextFunction) {
     try {
-      const { username } = (await verifyRefresh(req.cookies[REFRESH_KEY])) as {
-        username: string;
+      const { id } = (await verifyRefresh(req.cookies[REFRESH_KEY])) as {
+        id: string;
       };
 
-      console.log("FROM VERIFY", username);
-      const user = await findUser(username);
+      const user = await getUserById(Number(id));
 
       if (!user) throw new ValidationError(EMESSAGE_403, ECODE_403);
 
       const { accessToken, refreshToken } = await generateTokens(user);
 
-      // TODO: invalidate access and refresh token
+      // TODO: invalidate old refresh token
+      await invalidateRefreshToken(req.cookies[REFRESH_KEY]);
+
+      // TODO: add new refresh token
+      const in7Days = new Date();
+      in7Days.setDate(in7Days.getDate() + 7);
+      await saveRefreshToken(refreshToken, in7Days, user.id);
+
       res.cookie(REFRESH_KEY, refreshToken, {
         httpOnly: true,
         sameSite: "lax",
@@ -111,6 +122,8 @@ router.get(
     } catch (err) {
       let message = "Unknown error";
       let statusCode = 500;
+
+      console.log(err);
 
       if (err instanceof ValidationError) {
         message = err.message;
@@ -127,18 +140,14 @@ router.get(
   "/token",
   async function (req: Request, res: Response, next: NextFunction) {
     try {
-      const { username } = (await verifyRefresh(req.cookies[REFRESH_KEY])) as {
-        username: string;
+      const { id } = (await verifyRefresh(req.cookies[REFRESH_KEY])) as {
+        id: string;
       };
 
-      console.log("FROM VERIFY", username);
-      const user = await findUser(username);
+      // this expensive. Can we use old payload ignoring it being logged out?
+      const user = await getUserById(Number(id));
 
       if (!user) throw new ValidationError(EMESSAGE_403, ECODE_403);
-
-      // const claim = (await verifyToken(
-      //   req.headers.access_token as string
-      // )) as User;
 
       const accessToken = await generateAccessToken(user);
 
@@ -164,10 +173,25 @@ router.get(
 // Invalidate logout token + refresh token
 router.get(
   "/logout",
-  function (req: Request, res: Response, next: NextFunction) {
-    res.json({
-      data: [{ names: [] }],
-    });
+  async function (req: Request, res: Response, next: NextFunction) {
+    try {
+      await invalidateRefreshToken(req.cookies[REFRESH_KEY]);
+
+      // TODO: Invalidate accesskey in memory ( last only 15 mins) better than a network req.
+      res.json({
+        success: true,
+      });
+    } catch (err) {
+      let message = "Unknown error";
+      let statusCode = 500;
+
+      if (err instanceof ValidationError) {
+        message = err.message;
+        statusCode = err.statusCode;
+      }
+
+      res.status(statusCode).json({ success: false, error: message });
+    }
   }
 );
 
@@ -175,6 +199,11 @@ router.get(
 router.get(
   "/logout-all",
   function (req: Request, res: Response, next: NextFunction) {
+    /**
+     * TODO: 1. increment key version
+     * 2. add check for key_version
+     **/
+
     res.json({
       data: [{ names: [] }],
     });

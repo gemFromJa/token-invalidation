@@ -8,8 +8,8 @@ import logger from "morgan";
 import createError from "http-errors";
 
 // ROUTES
-import authRouter from "@/routes/auth/auth.controller.js";
-import dashboardRouter from "@/routes/dashboard/dashboard.controller.js";
+import authRouter from "@/features/auth/routes.js";
+import dashboardRouter from "@/features/dashboard/routes.js";
 
 // TYPES
 import type { Response, Request, NextFunction } from "express";
@@ -22,8 +22,8 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // Register routes
-app.use("/auth", authRouter);
-app.use("/dashboard", dashboardRouter);
+app.use("/auth", authRouter.authController);
+app.use("/dashboard", dashboardRouter.dashboardController);
 
 // Catch 404 and forward to error handler
 app.use(function (_, __, next: NextFunction) {

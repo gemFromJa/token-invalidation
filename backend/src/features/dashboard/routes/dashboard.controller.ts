@@ -1,15 +1,12 @@
-import express, {
-  type Request,
-  type Response,
-  type NextFunction,
-} from "express";
-import { readJsonFile } from "./dashboard.services.js";
-import { protectedRoute } from "../auth/auth.middleware.js";
+import express, { type Response } from "express";
+import { readJsonFile } from "../services/data.js";
+import { protectedRoute } from "@/features/auth/middleware/auth.js";
 const router = express.Router();
 
 /* GET dashboard page. */
 router.get("/", protectedRoute, async function (_, res: Response) {
   try {
+    // TODO: add data to db and implement pagination
     const data = (await readJsonFile()) || [];
 
     return res.status(200).json({
