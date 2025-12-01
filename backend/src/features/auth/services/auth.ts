@@ -52,7 +52,7 @@ export async function logout(token: string) {
 }
 
 //  Logout all devices for user
-export async function invalidateAllUsers(id: string) {
+export async function logoutAllDevices(id: string) {
   //  TODO: update cache as well
   return await invalidateAllUserTokens(id);
 }

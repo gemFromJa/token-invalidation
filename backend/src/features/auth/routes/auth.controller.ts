@@ -5,8 +5,8 @@ import express, {
 } from "express";
 import type { User } from "../types.js";
 import { ValidationError } from "@/common/errors.js";
-import { ECODE_403, EMESSAGE_403 } from "../constants.js";
-import { login, signup } from "../services/auth.js";
+import { ECODE_403, EMESSAGE_403, REFRESH_KEY } from "../constants.js";
+import { login, logoutAllDevices, signup } from "../services/auth.js";
 import {
   generateAccessToken,
   generateTokens,
@@ -14,9 +14,8 @@ import {
 } from "../services/jwt.js";
 import { getUserById } from "../db/user.js";
 import { invalidateRefreshToken, saveRefreshToken } from "../db/token.js";
-const router = express.Router();
 
-const REFRESH_KEY = "refresh_token";
+const router = express.Router();
 
 router.post(
   "/signup",
@@ -198,15 +197,33 @@ router.get(
 // invalidate all refresh + auth tokens
 router.get(
   "/logout-all",
-  function (req: Request, res: Response, next: NextFunction) {
+  async function (req: Request, res: Response, next: NextFunction) {
     /**
      * TODO: 1. increment key version
      * 2. add check for key_version
      **/
 
-    res.json({
-      data: [{ names: [] }],
-    });
+    try {
+      const payload = await verifyRefresh(req.cookies[REFRESH_KEY]);
+
+      if (payload.id) {
+        await logoutAllDevices(payload.id);
+      }
+
+      res.json({
+        success: true,
+      });
+    } catch (err) {
+      let message = "Unknown error";
+      let statusCode = 500;
+
+      if (err instanceof ValidationError) {
+        message = err.message;
+        statusCode = err.statusCode;
+      }
+
+      res.status(statusCode).json({ success: false, error: message });
+    }
   }
 );
 

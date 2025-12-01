@@ -2,7 +2,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import type { User } from "../types.js";
 import { ValidationError } from "@/common/errors.js";
-import jwt from "jsonwebtoken";
+import jwt, { type JwtPayload } from "jsonwebtoken";
 import { ECODE_403, EMESSAGE_403 } from "../constants.js";
 import { getCacheRefreshToken } from "../db/token.js";
 
@@ -81,7 +81,7 @@ export async function verifyRefresh(token: string) {
       throw new ValidationError("Not logged in", 401);
     }
 
-    return payload;
+    return payload as JwtPayload;
   } catch (error) {
     throw new ValidationError(EMESSAGE_403, ECODE_403);
   }

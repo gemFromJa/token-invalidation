@@ -1,16 +1,12 @@
 import db from "@/common/db.js";
 
 export async function getUserById(id: number) {
-  try {
-    const res = await db.query(
-      "Select * from public.user where id = $1 limit 1",
-      [id]
-    );
+  const res = await db.query(
+    "Select * from public.user where id = $1 limit 1",
+    [id]
+  );
 
-    return res.rows?.[0];
-  } finally {
-    // await client.connection.close();
-  }
+  return res.rows?.[0];
 }
 
 export async function getUserByUsername(username: string) {

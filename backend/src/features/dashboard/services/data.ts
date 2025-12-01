@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "url";
+import { getData } from "../db/data.js";
+import type { SearchQuery } from "../types.js";
 
 // 1. Get the absolute path to this file (using fileURLToPath)
 const __filename = fileURLToPath(import.meta.url);
@@ -19,4 +21,8 @@ export async function readJsonFile() {
     console.error("Error reading or parsing JSON file:", error);
     throw error;
   }
+}
+
+export async function getDashboardData(props: SearchQuery) {
+  return await getData(props);
 }
