@@ -16,15 +16,17 @@ router.get(
       // TODO: add data to db and implement pagination
       const params = {
         searchTerm: req.query.searchTerm,
-        offset: Number(req.query.startRow),
-        limit: Number(req.query.count ?? 10),
+        offset: Number(req.query.offset),
+        page: Number(req.query.page),
+        limit: Number(req.query.limit ?? 10),
         orderBy: req.query.orderBy,
         direction: req.query.direction ?? "DESC",
       };
       const data = await getDashboardData(params);
 
       return res.status(200).json({
-        data,
+        data: data,
+        success: true,
       });
     } catch (error) {
       console.log(error);

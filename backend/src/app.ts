@@ -6,6 +6,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import logger from "morgan";
 import createError from "http-errors";
+import cors from "cors";
 
 // ROUTES
 import authRouter from "@/features/auth/routes.js";
@@ -15,6 +16,13 @@ import dashboardRouter from "@/features/dashboard/routes.js";
 import type { Response, Request, NextFunction } from "express";
 
 const app = express();
+
+app.use(
+  cors({
+    credentials: true,
+    origin: process.env.FRONTEND_URL,
+  })
+);
 
 app.use(logger("dev"));
 app.use(express.json());

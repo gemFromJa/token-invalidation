@@ -83,6 +83,7 @@ export async function verifyRefresh(token: string) {
 
     return payload as JwtPayload;
   } catch (error) {
+    console.log(error);
     throw new ValidationError(EMESSAGE_403, ECODE_403);
   }
 }

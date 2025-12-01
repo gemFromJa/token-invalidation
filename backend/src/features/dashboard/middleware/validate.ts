@@ -12,6 +12,7 @@ const urlSchema = z.object({
   searchTerm: z.string().optional(),
   limit: z.number().min(10),
   offset: z.number().min(0).optional(),
+  page: z.number().min(1).optional(),
   orderBy: z.enum(sortingFields).optional(),
   direction: z.enum(["DESC", "ASC", "asc", "desc"]).optional(),
 });
@@ -24,8 +25,9 @@ export async function validate(
   try {
     const limit = Number(req.query.limit);
     const offset = req.query.offset ? Number(req.query.offset) : undefined;
+    const page = req.query.page ? Number(req.query.page) : undefined;
 
-    urlSchema.parse({ ...req.query, limit, offset });
+    urlSchema.parse({ ...req.query, limit, page, offset });
 
     next();
   } catch (error) {

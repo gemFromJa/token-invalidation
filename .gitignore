@@ -3,5 +3,11 @@ dist/
 designs/
 
 
+**/backups/*
+
+
 .env
 .env.local
+
+
+.DS_STORE

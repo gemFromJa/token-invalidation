@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import bcrypt from "bcrypt";
@@ -55,16 +54,4 @@ export async function logout(token: string) {
 export async function logoutAllDevices(id: string) {
   //  TODO: update cache as well
   return await invalidateAllUserTokens(id);
-}
-
-// TOD: Cleanuo
-async function readJsonFile() {
-  try {
-    const data = await fs.readFile(path.join(__dirname, "auth.txt"), "utf8");
-    const jsonObject = JSON.parse(data);
-    return jsonObject;
-  } catch (error) {
-    console.error("Error reading or parsing JSON file:", error);
-    throw error;
-  }
 }

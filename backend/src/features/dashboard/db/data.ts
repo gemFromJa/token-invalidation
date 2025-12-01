@@ -5,18 +5,25 @@ export async function getData({
   searchTerm,
   offset,
   limit = 10,
+  page,
   orderBy,
   direction = "DESC",
 }: SearchQuery) {
   let paramCount = 1;
   const params = [];
   let generateQuery = "Select * from public.sales_team";
+  let countQuery = "Select count(id) from public.sales_team";
 
   if (searchTerm) {
-    generateQuery += ` where first_name ilike $${paramCount} or last_name ilike $${paramCount} or email ilike $${paramCount}`;
+    const whereClause = ` where first_name ilike $${paramCount} or last_name ilike $${paramCount} or email ilike $${paramCount}`;
+    generateQuery += whereClause;
+    countQuery += whereClause;
     paramCount++;
     params.push(`%${searchTerm}%`);
   }
+
+  //  run a count query
+  let totalCountQuery = db.query(countQuery.toString(), params);
 
   if (
     orderBy &&
@@ -31,14 +38,29 @@ export async function getData({
     generateQuery += ` offset ${offset}`;
   }
 
+  if (!offset && page) {
+    const calcOffset = (page - 1) * limit;
+    generateQuery += ` offset ${calcOffset}`;
+  }
+
   if (limit) {
     generateQuery += ` limit ${limit}`;
   }
 
-  console.log(generateQuery);
-  // return [];
+  const [res] = await Promise.all([
+    db.query(generateQuery.toString(), params),
+    totalCountQuery,
+  ]);
 
-  const res = await db.query(generateQuery.toString(), params);
+  const result = (await totalCountQuery).rows[0].count;
 
-  return res.rows;
+  const total_pages = Math.ceil(result / limit);
+  const current_page = offset ? Math.ceil(offset / limit) : 1;
+
+  return {
+    total_records: result,
+    current_page,
+    total_pages,
+    data: res.rows,
+  };
 }

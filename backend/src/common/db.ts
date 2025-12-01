@@ -12,6 +12,9 @@ const pool = new Pool({
   // Optional: Set a max size for the pool
   max: 20,
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  ssl: {
+    rejectUnauthorized: false, // Required for Render
+  },
 });
 
 // The pool will automatically use a ready connection for each query.

@@ -5,7 +5,12 @@ import express, {
 } from "express";
 import type { User } from "../types.js";
 import { ValidationError } from "@/common/errors.js";
-import { ECODE_403, EMESSAGE_403, REFRESH_KEY } from "../constants.js";
+import {
+  ACCESS_KEY,
+  ECODE_403,
+  EMESSAGE_403,
+  REFRESH_KEY,
+} from "../constants.js";
 import { login, logoutAllDevices, signup } from "../services/auth.js";
 import {
   generateAccessToken,
@@ -14,6 +19,7 @@ import {
 } from "../services/jwt.js";
 import { getUserById } from "../db/user.js";
 import { invalidateRefreshToken, saveRefreshToken } from "../db/token.js";
+import { fa } from "zod/locales";
 
 const router = express.Router();
 
@@ -38,6 +44,12 @@ router.post(
   }
 );
 
+function getDomain(url: string) {
+  const parsedUrl = new URL((url.startsWith("http") ? "" : "https://") + url);
+
+  return parsedUrl.hostname;
+}
+
 /* Login to Application and get tokens */
 router.post(
   "/login",
@@ -56,9 +68,21 @@ router.post(
       // save refresh token in cookie
       res.cookie(REFRESH_KEY, refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production", // Use secure in production
+        // secure: process.env.NODE_ENV === "production", // Use secure in production
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
-        sameSite: "lax",
+        // sameSite: "lax",
+        domain: getDomain(process.env.VERCEL_URL || ""),
+        sameSite: "none",
+        secure: true,
+      });
+      res.cookie(ACCESS_KEY, accessToken, {
+        // httpOnly: true,
+        // secure: process.env.NODE_ENV === "production", // Use secure in production
+        maxAge: 1 * 60 * 1000, // 10 mins in milliseconds
+        // sameSite: "lax",
+        domain: getDomain(process.env.VERCEL_URL || ""),
+        sameSite: "none",
+        secure: true,
       });
 
       //  TODO: save refresh token to file
@@ -110,9 +134,21 @@ router.get(
 
       res.cookie(REFRESH_KEY, refreshToken, {
         httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        // sameSite: "lax",
+        secure: true,
+        domain: getDomain(process.env.VERCEL_URL || ""),
+        sameSite: "none",
+        // secure: process.env.NODE_ENV === "production",
         maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+      res.cookie(ACCESS_KEY, accessToken, {
+        httpOnly: true,
+        // secure: process.env.NODE_ENV === "production", // Use secure in production
+        maxAge: 10 * 60 * 1000, // 7 days in milliseconds
+        // sameSite: "lax",
+        domain: getDomain(process.env.VERCEL_URL || ""),
+        sameSite: "none",
+        secure: true,
       });
 
       return res.status(200).json({
@@ -139,7 +175,7 @@ router.get(
   "/token",
   async function (req: Request, res: Response, next: NextFunction) {
     try {
-      const { id } = (await verifyRefresh(req.cookies[REFRESH_KEY])) as {
+      const { id } = (await verifyRefresh(await req.cookies[REFRESH_KEY])) as {
         id: string;
       };
 
@@ -149,6 +185,15 @@ router.get(
       if (!user) throw new ValidationError(EMESSAGE_403, ECODE_403);
 
       const accessToken = await generateAccessToken(user);
+
+      res.cookie(ACCESS_KEY, accessToken, {
+        // secure: process.env.NODE_ENV === "production", // Use secure in production
+        maxAge: 10 * 60 * 1000, // 7 days in milliseconds
+        // sameSite: "lax",
+        domain: "localhost",
+        sameSite: "none",
+        secure: true,
+      });
 
       // TODO: invalidate access token
 
@@ -170,29 +215,29 @@ router.get(
 );
 
 // Invalidate logout token + refresh token
-router.get(
-  "/logout",
-  async function (req: Request, res: Response, next: NextFunction) {
-    try {
-      await invalidateRefreshToken(req.cookies[REFRESH_KEY]);
+router.get("/logout", async function (req: Request, res: Response) {
+  try {
+    await invalidateRefreshToken(req.cookies[REFRESH_KEY]);
 
-      // TODO: Invalidate accesskey in memory ( last only 15 mins) better than a network req.
-      res.json({
-        success: true,
-      });
-    } catch (err) {
-      let message = "Unknown error";
-      let statusCode = 500;
+    res.clearCookie(REFRESH_KEY);
+    res.clearCookie(ACCESS_KEY);
 
-      if (err instanceof ValidationError) {
-        message = err.message;
-        statusCode = err.statusCode;
-      }
+    // TODO: Invalidate accesskey in memory ( last only 15 mins) better than a network req.
+    res.json({
+      success: true,
+    });
+  } catch (err) {
+    let message = "Unknown error";
+    let statusCode = 500;
 
-      res.status(statusCode).json({ success: false, error: message });
+    if (err instanceof ValidationError) {
+      message = err.message;
+      statusCode = err.statusCode;
     }
+
+    res.status(statusCode).json({ success: false, error: message });
   }
-);
+});
 
 // invalidate all refresh + auth tokens
 router.get(
